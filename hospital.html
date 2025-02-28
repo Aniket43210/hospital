@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Nearby Hospitals</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        button {
+            padding: 10px;
+            margin: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>Find Nearby Hospitals</h2>
+    <button onclick="getUserLocation()">Refresh Location</button>
+    <button onclick="findHospitals()">Find Hospitals</button>
+    <div id="map"></div>
+
+    <script>
+        let map = L.map("map").setView([0, 0], 13); // Default blank view
+
+        // Load OpenStreetMap tiles
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let userMarker, hospitalMarkers = [], routeLayer;
+
+        // ✅ Always get fresh user location
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    let lat = position.coords.latitude;
+                    let lng = position.coords.longitude;
+                    let userLocation = [lat, lng];
+
+                    // Move the map to the current user location
+                    map.setView(userLocation, 13);
+
+                    // Remove previous user marker if it exists
+                    if (userMarker) map.removeLayer(userMarker);
+                    
+                    // Add new marker for the current user
+                    userMarker = L.marker(userLocation, {
+                        icon: L.icon({ iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png", iconSize: [30, 30] })
+                    })
+                    .addTo(map)
+                    .bindPopup("Your Location")
+                    .openPopup();
+                }, () => {
+                    alert("Geolocation failed. Please allow location access.");
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // ✅ Find hospitals near the current user
+        function findHospitals() {
+            if (!userMarker) {
+                alert("Please enable location first.");
+                return;
+            }
+
+            let userLocation = userMarker.getLatLng();
+            let queryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=hospital&bounded=1&viewbox=${userLocation.lng - 0.05},${userLocation.lat + 0.05},${userLocation.lng + 0.05},${userLocation.lat - 0.05}`;
+
+            fetch(queryUrl)
+                .then(response => response.json())
+                .then(data => {
+                    // Remove previous hospital markers
+                    if (hospitalMarkers.length) {
+                        hospitalMarkers.forEach(marker => map.removeLayer(marker));
+                    }
+                    hospitalMarkers = [];
+
+                    data.forEach(place => {
+                        let hospitalMarker = L.marker([place.lat, place.lon])
+                            .addTo(map)
+                            .bindPopup(`<strong>${place.display_name}</strong><br>
+                                        <button onclick="getRoute(${place.lat}, ${place.lon})">Get Route</button>`);
+                        hospitalMarkers.push(hospitalMarker);
+                    });
+
+                    if (data.length === 0) alert("No hospitals found nearby.");
+                })
+                .catch(error => console.error("Error fetching hospitals:", error));
+        }
+
+        // ✅ Get route to the selected hospital
+        function getRoute(destLat, destLon) {
+            if (!userMarker) {
+                alert("Please enable location first.");
+                return;
+            }
+
+            let userLocation = userMarker.getLatLng();
+            let routeUrl = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLon},${destLat}?overview=full&geometries=geojson`;
+
+            fetch(routeUrl)
+                .then(response => response.json())
+                .then(data => {
+                    // Remove previous route
+                    if (routeLayer) map.removeLayer(routeLayer);
+
+                    let routeCoords = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    routeLayer = L.polyline(routeCoords, { color: "blue", weight: 5 }).addTo(map);
+
+                    map.fitBounds(routeLayer.getBounds());
+                })
+                .catch(error => console.error("Error fetching route:", error));
+        }
+
+        // ✅ Ensure every user sees their own location when they open the page
+        window.onload = getUserLocation;
+    </script>
+</body>
+</html>
