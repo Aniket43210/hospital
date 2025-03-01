@@ -17,15 +17,16 @@
         }
         button {
             padding: 10px;
-            margin: 10px;
+            margin: 5px;
             cursor: pointer;
         }
     </style>
 </head>
 <body>
     <h2>Find Nearby Hospitals</h2>
-    <button onclick="getUserLocation()">Refresh Location</button>
-    <button onclick="findHospitals()">Find Hospitals</button>
+    <button onclick="getUserLocation()">📍 Get My Location</button>
+    <button onclick="findHospitals()">🏥 Find Hospitals</button>
+    <div id="output">Location will appear here</div>
     <div id="map"></div>
 
     <script>
@@ -38,39 +39,46 @@
 
         let userMarker, hospitalMarkers = [], routeLayer;
 
-        // ✅ Always get fresh user location
+        // ✅ Accurate Location Fetch (Using Simplified Test Code)
         function getUserLocation() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    let lat = position.coords.latitude;
-                    let lng = position.coords.longitude;
-                    let userLocation = [lat, lng];
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        let lat = position.coords.latitude;
+                        let lng = position.coords.longitude;
+                        let userLocation = [lat, lng];
 
-                    // Move the map to the current user location
-                    map.setView(userLocation, 13);
+                        // Move the map to user's location
+                        map.setView(userLocation, 13);
 
-                    // Remove previous user marker if it exists
-                    if (userMarker) map.removeLayer(userMarker);
-                    
-                    // Add new marker for the current user
-                    userMarker = L.marker(userLocation, {
-                        icon: L.icon({ iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png", iconSize: [30, 30] })
-                    })
-                    .addTo(map)
-                    .bindPopup("Your Location")
-                    .openPopup();
-                }, () => {
-                    alert("Geolocation failed. Please allow location access.");
-                });
+                        // Remove previous user marker
+                        if (userMarker) map.removeLayer(userMarker);
+
+                        // Add new user marker
+                        userMarker = L.marker(userLocation, {
+                            icon: L.icon({ iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png", iconSize: [30, 30] })
+                        })
+                        .addTo(map)
+                        .bindPopup("📍 Your Location")
+                        .openPopup();
+
+                        // ✅ Display location in text output
+                        document.getElementById("output").innerText = `📍 Latitude: ${lat}, Longitude: ${lng}`;
+                    },
+                    (error) => {
+                        document.getElementById("output").innerText = "Error: " + error.message;
+                        alert("Geolocation failed. Please allow location access.");
+                    }
+                );
             } else {
                 alert("Geolocation is not supported by this browser.");
             }
         }
 
-        // ✅ Find hospitals near the current user
+        // ✅ Find hospitals near the user's location
         function findHospitals() {
             if (!userMarker) {
-                alert("Please enable location first.");
+                alert("Please get your location first.");
                 return;
             }
 
@@ -81,16 +89,14 @@
                 .then(response => response.json())
                 .then(data => {
                     // Remove previous hospital markers
-                    if (hospitalMarkers.length) {
-                        hospitalMarkers.forEach(marker => map.removeLayer(marker));
-                    }
+                    hospitalMarkers.forEach(marker => map.removeLayer(marker));
                     hospitalMarkers = [];
 
                     data.forEach(place => {
                         let hospitalMarker = L.marker([place.lat, place.lon])
                             .addTo(map)
                             .bindPopup(`<strong>${place.display_name}</strong><br>
-                                        <button onclick="getRoute(${place.lat}, ${place.lon})">Get Route</button>`);
+                                        <button onclick="getRoute(${place.lat}, ${place.lon})">🛣️ Get Route</button>`);
                         hospitalMarkers.push(hospitalMarker);
                     });
 
@@ -99,10 +105,10 @@
                 .catch(error => console.error("Error fetching hospitals:", error));
         }
 
-        // ✅ Get route to the selected hospital
+        // ✅ Get route to selected hospital
         function getRoute(destLat, destLon) {
             if (!userMarker) {
-                alert("Please enable location first.");
+                alert("Please get your location first.");
                 return;
             }
 
@@ -123,7 +129,7 @@
                 .catch(error => console.error("Error fetching route:", error));
         }
 
-        // ✅ Ensure every user sees their own location when they open the page
+        // ✅ Automatically get user location when page loads
         window.onload = getUserLocation;
     </script>
 </body>
